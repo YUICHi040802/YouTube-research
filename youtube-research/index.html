@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube 登録者増加率リサーチツール</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+  <!-- ヘッダー -->
+  <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-20 shadow-xl">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-8 h-8 bg-red-600 rounded-lg flex-shrink-0 flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-base font-bold leading-tight truncate">YouTube 登録者増加率ツール</h1>
+          <p id="lastUpdated" class="text-xs text-gray-500"></p>
+        </div>
+      </div>
+      <button id="refreshBtn" onclick="refreshData()"
+        class="flex-shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>データ更新</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+    <!-- 検索セクション -->
+    <section class="bg-gray-800 rounded-xl border border-gray-700 p-5">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">チャンネルを追加</h2>
+      <div class="flex gap-2">
+        <input id="searchInput" type="text"
+          placeholder="チャンネル名・キーワードで検索..."
+          class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors">
+        <button id="searchBtn" onclick="handleSearch()"
+          class="bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap">
+          検索
+        </button>
+      </div>
+
+      <!-- 検索結果 -->
+      <div id="searchResultsSection" class="hidden mt-4">
+        <p class="text-xs text-gray-500 mb-2">検索結果</p>
+        <div id="searchResultsList" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- ウォッチリスト -->
+    <section class="bg-gray-800 rounded-xl border border-gray-700 p-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-widest">ウォッチリスト</h2>
+          <p id="channelCount" class="text-xs text-gray-600 mt-0.5">0 チャンネル</p>
+        </div>
+        <!-- ソートボタン -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-xs text-gray-500 mr-1">並び替え:</span>
+          <button class="sort-btn active-sort px-3 py-1.5 rounded-lg text-xs font-medium" data-sort="subscribers">登録者数</button>
+          <button class="sort-btn inactive-sort px-3 py-1.5 rounded-lg text-xs font-medium" data-sort="1d">1日増加率</button>
+          <button class="sort-btn inactive-sort px-3 py-1.5 rounded-lg text-xs font-medium" data-sort="10d">10日増加率</button>
+          <button class="sort-btn inactive-sort px-3 py-1.5 rounded-lg text-xs font-medium" data-sort="100d">100日増加率</button>
+        </div>
+      </div>
+      <div id="watchlistContainer"></div>
+    </section>
+
+  </main>
+
+  <!-- トースト通知 -->
+  <div id="toast"
+    class="fixed bottom-5 right-5 z-50 text-sm px-4 py-3 rounded-xl shadow-2xl border border-gray-700 bg-gray-800 transition-all duration-300 opacity-0 translate-y-3 pointer-events-none max-w-xs">
+    <p id="toastMsg"></p>
+  </div>
+
+  <script>
+    // ========== 定数 ==========
+    const S_LIST = 'yt_watchlist_v1';
+    const S_HIST = 'yt_history_v1';
+    const MS_DAY = 86400000;
+
+    // ========== 状態 ==========
+    let watchlist   = JSON.parse(localStorage.getItem(S_LIST) || '[]');
+    let history     = JSON.parse(localStorage.getItem(S_HIST) || '{}');
+    let searchCache = [];
+    let currentSort = 'subscribers';
+
+    // ========== 保存 ==========
+    function save() {
+      localStorage.setItem(S_LIST, JSON.stringify(watchlist));
+      localStorage.setItem(S_HIST, JSON.stringify(history));
+    }
+
+    // ========== フォーマット ==========
+    function fmt(n) {
+      if (n == null) return '非公開';
+      if (n >= 1e8)  return (n / 1e8).toFixed(1) + '億';
+      if (n >= 1e4)  return (n / 1e4).toFixed(1) + '万';
+      return n.toLocaleString('ja-JP');
+    }
+
+    // ========== 増加率計算 ==========
+    function getGrowth(channelId, days) {
+      const snaps = history[channelId];
+      if (!snaps || snaps.length < 2) return null;
+
+      // 新しい順に並べて最新スナップショットを基準にする
+      const sorted  = [...snaps].sort((a, b) => b.t - a.t);
+      const latest  = sorted[0];
+      const target  = latest.t - days * MS_DAY;
+
+      // target 時刻に最も近いスナップショット（最新より前のもの）
+      const past = sorted.slice(1).reduce((best, item) => {
+        if (!best) return item;
+        return Math.abs(item.t - target) < Math.abs(best.t - target) ? item : best;
+      }, null);
+
+      if (!past || past.v == null || latest.v == null || past.v === 0) return null;
+
+      // target との時間差が days の 50% 以上ずれている場合はデータ不足と判断
+      const timeDiff = Math.abs(latest.t - past.t);
+      if (timeDiff < days * MS_DAY * 0.3) return null;
+
+      return ((latest.v - past.v) / past.v) * 100;
+    }
+
+    function growthTag(rate) {
+      if (rate === null) return { text: '─', note: 'データ収集中', cls: 'text-gray-600' };
+      const sign = rate > 0 ? '+' : '';
+      const cls  = rate > 0 ? 'text-green-400' : rate < 0 ? 'text-red-400' : 'text-gray-400';
+      return { text: `${sign}${rate.toFixed(2)}%`, note: '', cls };
+    }
+
+    function addSnapshot(channelId, subscribers) {
+      if (!history[channelId]) history[channelId] = [];
+      history[channelId].push({ t: Date.now(), v: subscribers });
+      // 120日以上古いデータを削除
+      const cutoff = Date.now() - 120 * MS_DAY;
+      history[channelId] = history[channelId].filter(s => s.t > cutoff);
+    }
+
+    // ========== API ==========
+    async function apiSearch(q) {
+      const res = await fetch(`/api/youtube?action=search&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '検索失敗');
+      return data;
+    }
+
+    async function apiStats(ids) {
+      const res  = await fetch(`/api/youtube?action=stats&ids=${ids.join(',')}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '取得失敗');
+      return data;
+    }
+
+    // ========== 描画: ウォッチリスト ==========
+    function renderWatchlist() {
+      const el = document.getElementById('watchlistContainer');
+      document.getElementById('channelCount').textContent = `${watchlist.length} チャンネル`;
+
+      if (watchlist.length === 0) {
+        el.innerHTML = `
+          <div class="text-center py-14 text-gray-700">
+            <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <p class="font-semibold">チャンネルが登録されていません</p>
+            <p class="text-sm mt-1">検索フォームからチャンネルを追加してください</p>
+          </div>`;
+        return;
+      }
+
+      // ソート
+      const daysMap = { '1d': 1, '10d': 10, '100d': 100 };
+      const sorted  = [...watchlist].sort((a, b) => {
+        if (currentSort === 'subscribers') return (b.subscribers ?? -1) - (a.subscribers ?? -1);
+        const d  = daysMap[currentSort];
+        const ra = getGrowth(a.id, d) ?? -Infinity;
+        const rb = getGrowth(b.id, d) ?? -Infinity;
+        return rb - ra;
+      });
+
+      el.innerHTML = sorted.map((ch, i) => {
+        const g1   = growthTag(getGrowth(ch.id, 1));
+        const g10  = growthTag(getGrowth(ch.id, 10));
+        const g100 = growthTag(getGrowth(ch.id, 100));
+        const snaps = (history[ch.id] || []).length;
+        const rankCls = i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-gray-700';
+
+        return `
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border border-gray-700 hover:border-gray-600 hover:bg-gray-700/30 transition-colors mb-2">
+            <div class="w-6 text-center pt-1 flex-shrink-0">
+              <span class="text-sm font-black ${rankCls}">${i + 1}</span>
+            </div>
+            <img src="${ch.thumbnail}" alt="${ch.title}"
+              onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23374151%22 width=%2240%22 height=%2240%22/></svg>'"
+              class="w-11 h-11 rounded-full flex-shrink-0 bg-gray-700 object-cover">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start gap-2 justify-between">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-white truncate">${ch.title}</p>
+                  <p class="text-xs text-gray-500 truncate mt-0.5">${ch.description || ''}</p>
+                </div>
+                <button onclick="removeChannel('${ch.id}')"
+                  class="flex-shrink-0 text-gray-700 hover:text-red-400 transition-colors p-0.5 mt-0.5" title="削除">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <!-- 統計グリッド -->
+              <div class="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2">
+                <div class="bg-gray-800 rounded-lg px-2.5 py-2">
+                  <p class="text-xs text-gray-500">登録者数</p>
+                  <p class="text-sm font-bold text-white">${fmt(ch.subscribers)}</p>
+                </div>
+                <div class="bg-gray-800 rounded-lg px-2.5 py-2">
+                  <p class="text-xs text-gray-500">1日増加率</p>
+                  <p class="text-sm font-bold ${g1.cls}">${g1.text}</p>
+                  ${g1.note ? `<p class="text-xs text-gray-700">${g1.note}</p>` : ''}
+                </div>
+                <div class="bg-gray-800 rounded-lg px-2.5 py-2">
+                  <p class="text-xs text-gray-500">10日増加率</p>
+                  <p class="text-sm font-bold ${g10.cls}">${g10.text}</p>
+                  ${g10.note ? `<p class="text-xs text-gray-700">${g10.note}</p>` : ''}
+                </div>
+                <div class="bg-gray-800 rounded-lg px-2.5 py-2">
+                  <p class="text-xs text-gray-500">100日増加率</p>
+                  <p class="text-sm font-bold ${g100.cls}">${g100.text}</p>
+                  ${g100.note ? `<p class="text-xs text-gray-700">${g100.note}</p>` : ''}
+                </div>
+              </div>
+              ${snaps > 0 ? `<p class="text-xs text-gray-700 mt-1.5">${snaps} 件のスナップショット保存済み</p>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ========== 描画: 検索結果 ==========
+    function renderSearchResults() {
+      const section = document.getElementById('searchResultsSection');
+      const list    = document.getElementById('searchResultsList');
+
+      if (searchCache.length === 0) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+
+      list.innerHTML = searchCache.map((ch, idx) => {
+        const inList = watchlist.some(c => c.id === ch.id);
+        return `
+          <div class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-700 hover:border-gray-600 bg-gray-700/40 transition-colors">
+            <img src="${ch.thumbnail}" alt="${ch.title}"
+              onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23374151%22 width=%2240%22 height=%2240%22/></svg>'"
+              class="w-9 h-9 rounded-full flex-shrink-0 bg-gray-700 object-cover">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-white truncate">${ch.title}</p>
+              <p class="text-xs text-gray-500">${ch.subscribers != null ? fmt(ch.subscribers) + ' 登録者' : '登録者数: 非公開'}</p>
+            </div>
+            <button onclick="toggleChannel(${idx})"
+              class="${inList
+                ? 'bg-gray-600 hover:bg-red-900 hover:text-red-300 text-gray-400'
+                : 'bg-red-600 hover:bg-red-500 text-white'} px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0">
+              ${inList ? '削除' : '＋ 追加'}
+            </button>
+          </div>`;
+      }).join('');
+    }
+
+    // ========== イベントハンドラ ==========
+    async function handleSearch() {
+      const q   = document.getElementById('searchInput').value.trim();
+      if (!q) return;
+
+      const btn = document.getElementById('searchBtn');
+      btn.textContent = '検索中...';
+      btn.disabled    = true;
+
+      try {
+        searchCache = await apiSearch(q);
+        renderSearchResults();
+        if (searchCache.length === 0) showToast('検索結果が見つかりませんでした');
+      } catch (e) {
+        showToast('検索失敗: ' + e.message, true);
+      } finally {
+        btn.textContent = '検索';
+        btn.disabled    = false;
+      }
+    }
+
+    function toggleChannel(idx) {
+      const ch = searchCache[idx];
+      const i  = watchlist.findIndex(c => c.id === ch.id);
+      if (i >= 0) {
+        watchlist.splice(i, 1);
+        showToast(`${ch.title} を削除しました`);
+      } else {
+        watchlist.push({ ...ch });
+        if (ch.subscribers != null) addSnapshot(ch.id, ch.subscribers);
+        showToast(`${ch.title} を追加しました`);
+      }
+      save();
+      renderSearchResults();
+      renderWatchlist();
+    }
+
+    function removeChannel(id) {
+      watchlist = watchlist.filter(c => c.id !== id);
+      save();
+      renderWatchlist();
+      showToast('チャンネルを削除しました');
+    }
+
+    async function refreshData() {
+      if (watchlist.length === 0) { showToast('チャンネルが登録されていません'); return; }
+
+      const btn  = document.getElementById('refreshBtn');
+      const icon = document.getElementById('refreshIcon');
+      btn.disabled = true;
+      icon.classList.add('spin');
+
+      try {
+        const ids   = watchlist.map(c => c.id);
+        const stats = await apiStats(ids);
+
+        let updated = 0;
+        stats.forEach(s => {
+          const ch = watchlist.find(c => c.id === s.id);
+          if (ch && s.subscribers != null) {
+            ch.subscribers = s.subscribers;
+            addSnapshot(s.id, s.subscribers);
+            updated++;
+          }
+        });
+
+        save();
+        renderWatchlist();
+        const now = new Date().toLocaleTimeString('ja-JP');
+        document.getElementById('lastUpdated').textContent = `最終更新: ${now}`;
+        showToast(`${updated} チャンネルを更新しました`);
+      } catch (e) {
+        showToast('更新失敗: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+        icon.classList.remove('spin');
+      }
+    }
+
+    // ========== トースト ==========
+    let toastTimer;
+    function showToast(msg, isErr = false) {
+      const el  = document.getElementById('toast');
+      const txt = document.getElementById('toastMsg');
+      txt.textContent  = msg;
+      el.style.borderColor = isErr ? '#ef4444' : '#374151';
+      el.classList.remove('opacity-0', 'translate-y-3');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('opacity-0', 'translate-y-3'), 3000);
+    }
+
+    // ========== ソートボタン ==========
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sort-btn').forEach(b => {
+          b.className = 'sort-btn inactive-sort px-3 py-1.5 rounded-lg text-xs font-medium';
+        });
+        btn.className = 'sort-btn active-sort px-3 py-1.5 rounded-lg text-xs font-medium';
+        currentSort   = btn.dataset.sort;
+        renderWatchlist();
+      });
+    });
+
+    // Tailwind で動的クラスが使えないため CSS で定義
+    document.head.insertAdjacentHTML('beforeend', `
+      <style>
+        .active-sort   { background:#2563eb; color:#fff; }
+        .inactive-sort { background:#374151; color:#9ca3af; }
+        .inactive-sort:hover { background:#4b5563; }
+      </style>`);
+
+    // Enter キーで検索
+    document.getElementById('searchInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSearch();
+    });
+
+    // 初期描画
+    renderWatchlist();
+  </script>
+</body>
+</html>
