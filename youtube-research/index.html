@@ -157,14 +157,14 @@
 
     // ========== API ==========
     async function apiSearch(q) {
-      const res = await fetch(`/api/youtube?action=search&q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/.netlify/functions/youtube?action=search&q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '検索失敗');
       return data;
     }
 
     async function apiStats(ids) {
-      const res  = await fetch(`/api/youtube?action=stats&ids=${ids.join(',')}`);
+      const res  = await fetch(`/.netlify/functions/youtube?action=stats&ids=${ids.join(',')}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '取得失敗');
       return data;
@@ -404,3 +404,4 @@
   </script>
 </body>
 </html>
+
